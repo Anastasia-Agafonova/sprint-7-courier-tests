@@ -1,17 +1,19 @@
 package ru.yandex.praktikum.tests;
 
-import ru.yandex.praktikum.models.Courier;
 import io.qameta.allure.Feature;
 import io.qameta.allure.Step;
 import io.qameta.allure.junit4.DisplayName;
 import io.qameta.allure.Description;
-import io.qameta.allure.restassured.AllureRestAssured;
 import io.restassured.RestAssured;
-import io.restassured.http.ContentType;
 import org.junit.Before;
 import org.junit.Test;
+import ru.yandex.praktikum.client.CourierClient;
 
-import static io.restassured.RestAssured.given;
+import static org.apache.http.HttpStatus.SC_OK;
+import static org.apache.http.HttpStatus.SC_CREATED;
+import static org.apache.http.HttpStatus.SC_BAD_REQUEST;
+import static org.apache.http.HttpStatus.SC_NOT_FOUND;
+
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.notNullValue;
 
@@ -20,12 +22,27 @@ import java.util.Random;
 @Feature("Логин курьера")
 public class CourierLoginTest {
 
+    private CourierClient courierClient;
+
+    private String login;
+    private String password;
+
     private static final String BASE_URL = "https://qa-scooter.praktikum-services.ru";
 
     @Before
-    @Step("Настройка базового URL перед тестами")
+    @Step("Подготовка данных для теста")
     public void setUp() {
         RestAssured.baseURI = BASE_URL;
+
+        courierClient = new CourierClient();
+
+        login = "ninja" + new Random().nextInt(1000000);
+        password = "password123";
+        String firstName = "saske";
+
+        courierClient.createCourier(login, password, firstName)
+                .then()
+                .statusCode(SC_CREATED);
     }
 
     @Step("Генерация случайного логина")
@@ -33,53 +50,16 @@ public class CourierLoginTest {
         return "ninja" + new Random().nextInt(1000000);
     }
 
-    @Step("Создание курьера для теста")
-    private void createCourier(String login, String password, String firstName) {
-        Courier courier = new Courier(login, password, firstName);
-
-        given()
-                .filter(new AllureRestAssured())
-                .contentType(ContentType.JSON)
-                .body(courier)
-                .when()
-                .post("/api/v1/courier/login")
-                .then()
-                .assertThat()
-                .statusCode(201);
-    }
-
     // Позитивные тесты
     @Test
     @DisplayName("Успешный логин курьера с валидными данными")
     @Description("Проверяем код 200 и возврат id курьера")
     public void courierCanLoginWithValidData() {
-        String login = getRandomLogin(); // создаем курьера
-        String password = "password123";
-        String firstName = "saske";
 
-        Courier newCourier = new Courier(login, password, firstName);
 
-        given()
-                .filter(new AllureRestAssured())
-                .contentType(ContentType.JSON)
-                .body(newCourier)
-                .when()
-                .post("/api/v1/courier")
+        courierClient.loginCourier(login, password)
                 .then()
-                .assertThat()
-                .statusCode(201);
-
-        Courier loginData = new Courier(login, password, null);
-
-        given()
-                .filter(new AllureRestAssured())
-                .contentType(ContentType.JSON)
-                .body(loginData)
-                .when()
-                .post("/api/v1/courier/login")
-                .then()
-                .assertThat()
-                .statusCode(200)
+                .statusCode(SC_OK)
                 .body("id", notNullValue());
     }
 
@@ -88,19 +68,10 @@ public class CourierLoginTest {
     @DisplayName("Логин с неверным паролем")
     @Description("Проверяем код 404 при неверном пароле")
     public void loginWithWrongPasswordReturnsError() {
-        String login = getRandomLogin();
 
-        Courier loginData = new Courier(login, "wrongPassword", null);
-
-        given()
-                .filter(new AllureRestAssured())
-                .contentType(ContentType.JSON)
-                .body(loginData)
-                .when()
-                .post("/api/v1/courier/login")
+        courierClient.loginCourier(login, "wrongPassword")
                 .then()
-                .assertThat()
-                .statusCode(404)
+                .statusCode(SC_NOT_FOUND)
                 .body("message", equalTo("Учетная запись не найдена"));
     }
 
@@ -110,17 +81,9 @@ public class CourierLoginTest {
     public void loginWithNotExistentLoginReturnsError() {
         String nonExistentLogin = getRandomLogin() + "_never_exists";
 
-        Courier loginData = new Courier(nonExistentLogin, "password123", null);
-
-        given()
-                .filter(new AllureRestAssured())
-                .contentType(ContentType.JSON)
-                .body(loginData)
-                .when()
-                .post("/api/v1/courier/login")
+        courierClient.loginCourier(nonExistentLogin, password)
                 .then()
-                .assertThat()
-                .statusCode(404)
+                .statusCode(SC_NOT_FOUND)
                 .body("message", equalTo("Учетная запись не найдена"));
     }
 
@@ -128,96 +91,53 @@ public class CourierLoginTest {
     @DisplayName("Логин без пароля возвращает ошибку")
     @Description("Проверяем код 400 при отсутствии обязательного поля password")
     public void loginWithoutPasswordReturnsError() {
-        String login = getRandomLogin(); // создаем курьера
 
-        Courier loginData = new Courier(login, "", null);
-
-        given()
-                .filter(new AllureRestAssured())
-                .contentType(ContentType.JSON)
-                .body(loginData)
-                .when()
-                .post("/api/v1/courier/login")
+        courierClient.loginCourier(login, null)
                 .then()
-                .assertThat()
-                .statusCode(400)
-                .body("message", equalTo("Недостаточно данных для входа"));
-    }
-
-    @Test
-    @DisplayName("Логин без логина возвращает ошибку")
-    @Description("Проверяем код 400 при отсутствии обязательного поля login")
-    public void LoginWithoutLoginReturnsError() {
-        String password = "password123";
-
-        Courier loginData = new Courier(null, password, null);
-
-        given()
-                .filter(new AllureRestAssured())
-                .contentType(ContentType.JSON)
-                .body(loginData)
-                .when()
-                .post("/api/v1/courier/login")
-                .then()
-                .assertThat()
-                .statusCode(400)
+                .statusCode(SC_BAD_REQUEST)
                 .body("message", equalTo("Недостаточно данных для входа"));
     }
 
     @Test
     @DisplayName("Логин с пустым паролем возвращает ошибку")
     @Description("Проверяем код 400 при пустом значении пароля")
-    public void lofinWithEmptyPasswordReturnError() {
-        String login = getRandomLogin();
-
-        Courier loginData = new Courier(login, "", null);
-
-        given()
-                .filter(new AllureRestAssured())
-                .contentType(ContentType.JSON)
-                .body(loginData)
-                .when()
-                .post("/api/v1/courier/login")
+    public void loginWithEmptyPasswordReturnError() {
+        courierClient.loginCourier(login, "")
                 .then()
-                .assertThat()
-                .statusCode(400)
+                .statusCode(SC_BAD_REQUEST)
+                .body("message", equalTo("Недостаточно данных для входа"));
+    }
+
+    @Test
+    @DisplayName("Логин без логина возвращает ошибку")
+    @Description("Проверяем код 400 при отсутствии обязательного поля login")
+    public void loginWithoutLoginReturnsError() {
+
+        courierClient.loginCourier(null, password)
+                .then()
+                .statusCode(SC_BAD_REQUEST)
                 .body("message", equalTo("Недостаточно данных для входа"));
     }
 
     @Test
     @DisplayName("Логин с пустым логином возвращает ошибку")
     @Description("Проверяем код 400 при пустом значении логина")
-    public void lofinWithEmptyLoginReturnError() {
-            String password = "password123";
+    public void loginWithEmptyLoginReturnError() {
 
-        Courier loginData = new Courier("", password, null);
-
-        given()
-                .filter(new AllureRestAssured())
-                .contentType(ContentType.JSON)
-                .body(loginData)
-                .when()
-                .post("/api/v1/courier/login")
+        courierClient.loginCourier("", password)
                 .then()
-                .assertThat()
-                .statusCode(400)
+                .statusCode(SC_BAD_REQUEST)
                 .body("message", equalTo("Недостаточно данных для входа"));
     }
 
     @Test
     @DisplayName("Логин без тела запроса")
     @Description("Проверяем код 400 при отсутствии тела запроса")
-    public void lofinWithEmptyBodyReturnError() {
+    public void loginWithEmptyBodyReturnError () {
 
-        given()
-                .filter(new AllureRestAssured())
-                .contentType(ContentType.JSON)
-                .body("{}")
-                .when()
-                .post("/api/v1/courier/login")
+        courierClient.loginWithEmptyBody()
                 .then()
-                .assertThat()
-                .statusCode(400)
+                .statusCode(SC_BAD_REQUEST)
                 .body("message", equalTo("Недостаточно данных для входа"));
     }
 }

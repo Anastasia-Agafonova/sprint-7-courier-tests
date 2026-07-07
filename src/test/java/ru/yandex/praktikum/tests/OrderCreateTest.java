@@ -1,32 +1,37 @@
 package ru.yandex.praktikum.tests;
 
+import org.junit.After;
+import ru.yandex.praktikum.client.OrderClient;
 import ru.yandex.praktikum.models.Order;
 import io.qameta.allure.Description;
 import io.qameta.allure.Feature;
 import io.qameta.allure.Step;
 import io.qameta.allure.junit4.DisplayName;
-import io.qameta.allure.restassured.AllureRestAssured;
 import io.restassured.RestAssured;
-import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import static org.apache.http.HttpStatus.SC_CREATED;
+import static org.apache.http.HttpStatus.SC_OK;
+import static org.hamcrest.Matchers.notNullValue;
+
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
-import static io.restassured.RestAssured.given;
-import static org.hamcrest.Matchers.notNullValue;
 
 @Feature("Создание заказа")
 @RunWith(Parameterized.class)
 public class OrderCreateTest {
 
     private static final String BASE_URL = "https://qa-scooter.praktikum-services.ru";
+
+    private OrderClient orderClient;
+    private int track;
 
     // Параметры для параметризации
     private final List<String> color;
@@ -48,9 +53,20 @@ public class OrderCreateTest {
     }
 
     @Before
-    @Step("Настройка базового URL перед тестами")
+    @Step("Настройка перед тестами")
     public void setUp() {
         RestAssured.baseURI = BASE_URL;
+        orderClient = new OrderClient();
+    }
+
+    @After
+    @Step("Отмена созданного заказа")
+    public void tearDown() {
+        if (track != 0) {
+            orderClient.cancelOrder(track)
+                    .then()
+                    .statusCode(SC_OK);
+        }
     }
 
     @Step("Создание заказа с цветами: {color}")
@@ -68,16 +84,6 @@ public class OrderCreateTest {
         );
     }
 
-    @Step("Отправка запроса на создание заказа")
-    private Response sendCreateOrderRequest(Order order) {
-        return given()
-                .filter(new AllureRestAssured())
-                .contentType(ContentType.JSON)
-                .body(order)
-                .when()
-                .post("/api/v1/orders");
-    }
-
     @Test
     @DisplayName("Создание заказа с разными цветами")
     @Description("Проверяем создание заказа с различными комбинациями цветов и возврат track")
@@ -85,11 +91,14 @@ public class OrderCreateTest {
         logTestScenario(testName);
         Order order = createOrder(color);
 
-        Response response = sendCreateOrderRequest(order);
+        Response response = orderClient.createOrder(order);
+
+        track = response.then()
+                .extract()
+                .path("track");
 
         response.then()
-                .assertThat()
-                .statusCode(201)
+                .statusCode(SC_CREATED)
                 .body("track", notNullValue());
     }
     @Step("Запуск сценария: {scenarioName}")

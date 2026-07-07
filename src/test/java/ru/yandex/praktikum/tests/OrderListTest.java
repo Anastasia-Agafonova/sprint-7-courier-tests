@@ -9,6 +9,9 @@ import io.restassured.RestAssured;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.http.HttpStatus.SC_OK;
+import static org.apache.http.HttpStatus.SC_NOT_FOUND;
+
 import java.util.List;
 
 import static io.restassured.RestAssured.given;
@@ -79,7 +82,7 @@ public class OrderListTest {
                 .get("/api/v1/orders")
                 .then()
                 .assertThat()
-                .statusCode(200)
+                .statusCode(SC_OK)
                 .body("orders", notNullValue())
                 .body("orders.track", notNullValue());
     }
@@ -99,7 +102,7 @@ public class OrderListTest {
                 .get("/api/v1/orders")
                 .then()
                 .assertThat()
-                .statusCode(200)
+                .statusCode(SC_OK)
                 .body("orders", notNullValue())
                 .body("orders.size()", lessThanOrEqualTo(limit));
     }
@@ -119,7 +122,7 @@ public class OrderListTest {
                 .get("/api/v1/orders")
                 .then()
                 .assertThat()
-                .statusCode(200)
+                .statusCode(SC_OK)
                 .body("orders", notNullValue());
     }
 
@@ -136,7 +139,7 @@ public class OrderListTest {
                 .get("/api/v1/orders")
                 .then()
                 .assertThat()
-                .statusCode(200)
+                .statusCode(SC_OK)
                 .body("orders", notNullValue());
     }
 
@@ -153,7 +156,7 @@ public class OrderListTest {
                 .get("/api/v1/orders")
                 .then()
                 .assertThat()
-                .statusCode(200)
+                .statusCode(SC_OK)
                 .body("orders", notNullValue());
     }
 
@@ -172,7 +175,7 @@ public class OrderListTest {
                 .get("/api/v1/orders")
                 .then()
                 .assertThat()
-                .statusCode(404);
+                .statusCode(SC_NOT_FOUND);
         }
 
     @Test
@@ -209,7 +212,7 @@ public class OrderListTest {
                 .get("/api/v1/orders")
                 .then()
                 .assertThat()
-                .statusCode(404);
+                .statusCode(SC_NOT_FOUND);
         }
 
     // Тесты на текстуру полей
@@ -224,7 +227,7 @@ public class OrderListTest {
                 .get("/api/v1/orders")
                 .then()
                 .assertThat()
-                .statusCode(200)
+                .statusCode(SC_OK)
                 .body("orders[0].status", instanceOf(Integer.class));
     }
 
@@ -238,7 +241,7 @@ public class OrderListTest {
                 .get("/api/v1/orders")
                 .then()
                 .assertThat()
-                .statusCode(200)
+                .statusCode(SC_OK)
                 .body("orders.color", anyOf(nullValue(), instanceOf(List.class)));
     }
 
@@ -252,7 +255,7 @@ public class OrderListTest {
                 .get("/api/v1/orders")
                 .then()
                 .assertThat()
-                .statusCode(200)
+                .statusCode(SC_OK)
                 .body("orders[0].deliveryDate", anyOf(nullValue(), matchesPattern("^\\d{4}-\\d{2}-\\d{2}.*$")));
     }
 
@@ -266,7 +269,7 @@ public class OrderListTest {
                 .get("/api/v1/orders")
                 .then()
                 .assertThat()
-                .statusCode(200)
+                .statusCode(SC_OK)
                 .body("orders[0].createdAt", anyOf(nullValue(), matchesPattern("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*$")))
                 .body("orders[0].updatedAt", anyOf(nullValue(), matchesPattern("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*$")));
     }
